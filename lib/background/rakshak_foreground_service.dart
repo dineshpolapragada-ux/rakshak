@@ -28,9 +28,9 @@ class RakshakTaskHandler extends TaskHandler {
     );
 
     await FlutterForegroundTask.updateService(
-      notificationTitle: 'Rakshak — VOICE TEST MODE',
-      notificationText: 'Rakshak background voice test is active',
-    );
+  notificationTitle: 'Rakshak — Voice SOS Active',
+  notificationText: 'Rakshak is listening for your voice SOS command',
+);
 
     await _startVoiceListening();
   }
@@ -130,7 +130,7 @@ class RakshakTaskHandler extends TaskHandler {
 
     FlutterForegroundTask.updateService(
       notificationText:
-          'Background voice service active • heartbeat #$heartbeatCount',
+    'Voice SOS active • heartbeat #$heartbeatCount',
     );
 
     FlutterForegroundTask.sendDataToMain({

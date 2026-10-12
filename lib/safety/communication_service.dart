@@ -19,13 +19,30 @@ class RakshakCommunicationService {
     );
 
     debugPrint('📱 RAKSHAK: Opening SMS composer');
+    debugPrint('📱 RAKSHAK: Recipient: $phoneNumber');
 
-    if (!await canLaunchUrl(uri)) {
-      debugPrint('❌ RAKSHAK: SMS composer unavailable');
+    try {
+      if (!await canLaunchUrl(uri)) {
+        debugPrint('❌ RAKSHAK: SMS composer unavailable');
+        return false;
+      }
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      debugPrint(
+        launched
+            ? '✅ RAKSHAK: SMS composer opened'
+            : '❌ RAKSHAK: Failed to open SMS composer',
+      );
+
+      return launched;
+    } catch (e) {
+      debugPrint('❌ RAKSHAK: SMS composer error: $e');
       return false;
     }
-
-    return launchUrl(uri);
   }
 
   Future<bool> openPhoneDialer({
@@ -38,42 +55,60 @@ class RakshakCommunicationService {
 
     debugPrint('📞 RAKSHAK: Opening phone dialer');
 
-    if (!await canLaunchUrl(uri)) {
-      debugPrint('❌ RAKSHAK: Phone dialer unavailable');
+    try {
+      if (!await canLaunchUrl(uri)) {
+        debugPrint('❌ RAKSHAK: Phone dialer unavailable');
+        return false;
+      }
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      debugPrint(
+        launched
+            ? '✅ RAKSHAK: Phone dialer opened'
+            : '❌ RAKSHAK: Failed to open phone dialer',
+      );
+
+      return launched;
+    } catch (e) {
+      debugPrint('❌ RAKSHAK: Phone dialer error: $e');
       return false;
     }
-
-    return launchUrl(uri);
   }
 
   String buildAlertMessage(RakshakAlertPayload payload) {
-  final buffer = StringBuffer()
-    ..writeln('🚨 RAKSHAK SOS ALERT')
-    ..writeln()
-    ..writeln(payload.message)
-    ..writeln()
-    ..writeln('Time: ${payload.timestamp.toLocal()}');
+    final buffer = StringBuffer()
+      ..writeln('🚨 RAKSHAK SOS ALERT')
+      ..writeln()
+      ..writeln(payload.message)
+      ..writeln()
+      ..writeln('Time: ${payload.timestamp.toLocal()}');
 
-  final location = payload.location;
+    final location = payload.location;
 
-  if (location != null) {
-    final latitude = location.latitude;
-    final longitude = location.longitude;
+    if (location != null) {
+      final latitude = location.latitude;
+      final longitude = location.longitude;
+
+      buffer
+        ..writeln()
+        ..writeln('📍 Location: $latitude, $longitude')
+        ..writeln(
+          'Accuracy: ${location.accuracy?.toStringAsFixed(1) ?? 'unknown'} m',
+        )
+        ..writeln()
+        ..writeln(
+          'Map: https://maps.google.com/?q=$latitude,$longitude',
+        );
+    }
 
     buffer
       ..writeln()
-      ..writeln('📍 Location: $latitude, $longitude')
-      ..writeln(
-        'Accuracy: ${location.accuracy?.toStringAsFixed(1) ?? 'unknown'} m',
-      )
-      ..writeln()
-      ..writeln('Map: https://maps.google.com/?q=$latitude,$longitude');
+      ..writeln('Sent using Rakshak.');
+
+    return buffer.toString();
   }
-
-  buffer
-    ..writeln()
-    ..writeln('Sent using Rakshak.');
-
-  return buffer.toString();
-}
 }

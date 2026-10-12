@@ -2,7 +2,7 @@
 
 import 'package:geolocator/geolocator.dart';
 
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+
 
 import 'package:flutter_contacts/flutter_contacts.dart';
 
@@ -97,14 +97,6 @@ Completer<bool>? _sosCountdownCompleter;
   // VOICE STATE
 
   // ============================================================
-
-  final stt.SpeechToText speech = stt.SpeechToText();
-
-  bool speechInitialized = false;
-
-  bool voiceListening = false;
-
-  bool voiceCommandHandled = false;
 
   String voiceStatus = 'Voice activation ready';
 
@@ -254,9 +246,11 @@ Future<void> activateSOS({bool immediate = false}) async {
 
     final event = RakshakSafetyEvent(
   type: 'sos_trigger',
-  message: 'SOS activated by user',
+  message: immediate
+      ? 'SOS activated by background voice command'
+      : 'SOS activated by user',
   timestamp: DateTime.now(),
-  source: 'sos_button',
+  source: immediate ? 'foreground_voice' : 'sos_button',
 );
 
     RakshakEventRouter.handle(event);
@@ -586,107 +580,6 @@ notificationText: 'Rakshak safety service is active.',
 
   
 
-  // ============================================================
-
-  // VOICE TEST
-
-  // ============================================================
-
-  Future<void> startVoiceTest() async {
-    if (voiceListening) return;
-
-    voiceCommandHandled = false;
-
-    setState(() {
-      voiceStatus = 'Preparing microphone...';
-
-      recognizedWords = '';
-    });
-
-    if (!speechInitialized) {
-      final bool available = await speech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-
-          setState(() {
-            voiceListening = status == 'listening';
-          });
-        },
-
-        onError: (error) {
-          if (!mounted) return;
-
-          setState(() {
-            voiceListening = false;
-
-            voiceStatus = 'Speech recognition unavailable';
-          });
-        },
-      );
-
-      speechInitialized = available;
-
-      if (!available) {
-        setState(() {
-          voiceStatus = 'Speech recognition unavailable on this device';
-        });
-
-        return;
-      }
-    }
-
-    setState(() {
-      voiceListening = true;
-
-      voiceStatus = 'Listening for "Rakshak SOS"...';
-    });
-
-    await speech.listen(
-  listenFor: const Duration(seconds: 10),
-  pauseFor: const Duration(seconds: 3),
-
-  onResult: (result) {
-    if (!mounted) return;
-
-    final String words = result.recognizedWords.toLowerCase().trim();
-
-    setState(() {
-      recognizedWords = result.recognizedWords;
-    });
-
-    if (words.contains('rakshak sos') && !voiceCommandHandled) {
-      voiceCommandHandled = true;
-
-      setState(() {
-        voiceStatus = 'Voice command recognized!';
-        voiceListening = false;
-      });
-
-      speech.stop();
-
-      debugPrint(
-        '🎙️🚨 RAKSHAK: Voice SOS phrase detected',
-      );
-
-      // Start the same 10-second SOS countdown used
-// by the physical SOS button.
-activateSOS(immediate: true);
-    }
-  },
-);
-  }
-
-  Future<void> stopVoiceTest() async {
-    await speech.stop();
-
-    if (!mounted) return;
-
-    setState(() {
-      voiceListening = false;
-
-      voiceStatus = 'Voice test stopped';
-    });
-  }
 
   // ============================================================
 
@@ -1271,16 +1164,6 @@ Text(
                 const Divider(color: Colors.white12),
 
 const SizedBox(height: 18),
-
-const Text(
-  'VOICE SOS TEST',
-
-  style: TextStyle(
-    fontSize: 12,
-    letterSpacing: 2,
-    color: Colors.white54,
-  ),
-),
 const Divider(color: Colors.white12),
 const SizedBox(height: 18),
 
@@ -1326,18 +1209,6 @@ Text(
 ),
 
 const SizedBox(height: 14),
-
-OutlinedButton.icon(
-  onPressed: voiceListening ? stopVoiceTest : startVoiceTest,
-  icon: Icon(
-    voiceListening ? Icons.mic_off : Icons.mic,
-  ),
-  label: Text(
-    voiceListening
-        ? 'STOP VOICE TEST'
-        : 'START VOICE TEST',
-  ),
-),
 
 if (recognizedWords.isNotEmpty) ...[
   const SizedBox(height: 10),
