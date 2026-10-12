@@ -47,24 +47,33 @@ class RakshakCommunicationService {
   }
 
   String buildAlertMessage(RakshakAlertPayload payload) {
-    final buffer = StringBuffer()
-      ..writeln('RAKSHAK SOS ALERT')
+  final buffer = StringBuffer()
+    ..writeln('🚨 RAKSHAK SOS ALERT')
+    ..writeln()
+    ..writeln(payload.message)
+    ..writeln()
+    ..writeln('Time: ${payload.timestamp.toLocal()}');
+
+  final location = payload.location;
+
+  if (location != null) {
+    final latitude = location.latitude;
+    final longitude = location.longitude;
+
+    buffer
       ..writeln()
-      ..writeln(payload.message);
-
-    final location = payload.location;
-
-    if (location != null) {
-      buffer
-        ..writeln()
-        ..writeln(
-          'Location: ${location.latitude}, ${location.longitude}',
-        )
-        ..writeln(
-  'Accuracy: ${location.accuracy?.toStringAsFixed(1) ?? 'unknown'} m',
-);
-    }
-
-    return buffer.toString();
+      ..writeln('📍 Location: $latitude, $longitude')
+      ..writeln(
+        'Accuracy: ${location.accuracy?.toStringAsFixed(1) ?? 'unknown'} m',
+      )
+      ..writeln()
+      ..writeln('Map: https://maps.google.com/?q=$latitude,$longitude');
   }
+
+  buffer
+    ..writeln()
+    ..writeln('Sent using Rakshak.');
+
+  return buffer.toString();
+}
 }

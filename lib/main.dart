@@ -185,11 +185,16 @@ Completer<bool>? _sosCountdownCompleter;
 
     super.dispose();
   }
+  
   // =================================================
 // PRODUCTION SOS
 // =================================================
 
 Future<void> activateSOS() async {
+  if (_sosCountdownActive || gettingLocation) {
+  debugPrint('⚠️ RAKSHAK: SOS already in progress — ignoring duplicate trigger');
+  return;
+}
   debugPrint('🚨 RAKSHAK: SOS ACTIVATED');
 
   _emergencyCountdown?.dispose();
@@ -250,11 +255,59 @@ Future<void> activateSOS() async {
       sosStatus = 'Getting location...';
     });
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
-    );
+    Position position;
+
+try {
+  final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+  if (!serviceEnabled) {
+    if (mounted) {
+      setState(() {
+        gettingLocation = false;
+        sosStatus = 'Location services are turned off';
+      });
+    }
+
+    debugPrint('⚠️ RAKSHAK: Location services are disabled');
+    return;
+  }
+
+  var permission = await Geolocator.checkPermission();
+
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+  }
+
+  if (permission == LocationPermission.denied ||
+      permission == LocationPermission.deniedForever) {
+    if (mounted) {
+      setState(() {
+        gettingLocation = false;
+        sosStatus = 'Location permission unavailable';
+      });
+    }
+
+    debugPrint('⚠️ RAKSHAK: Location permission unavailable');
+    return;
+  }
+
+  position = await Geolocator.getCurrentPosition(
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+    ),
+  );
+} catch (e) {
+  debugPrint('❌ RAKSHAK: Location acquisition failed: $e');
+
+  if (mounted) {
+    setState(() {
+      gettingLocation = false;
+      sosStatus = 'Unable to acquire emergency location';
+    });
+  }
+
+  return;
+}
 
     latestSafetyPosition = position;
 
@@ -407,10 +460,44 @@ Future<void> reviewSmsAlert(
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Rakshak will open your phone\'s SMS composer so you can review and send the alert.',
-                  style: TextStyle(color: Colors.white70),
-                ),
+
+Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(12),
+  decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(12),
+    color: Colors.white.withOpacity(0.06),
+  ),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Icon(
+        Icons.location_on,
+        color: Colors.redAccent,
+        size: 20,
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          payload.location != null
+              ? 'Emergency location captured and will be included in the alert.'
+              : 'Emergency location was not available.',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+
+const SizedBox(height: 12),
+
+const Text(
+  'Rakshak will open your phone\'s SMS composer so you can review and send the alert.',
+  style: TextStyle(color: Colors.white70),
+),
               ],
             ),
           ),
@@ -446,6 +533,7 @@ Future<void> reviewSmsAlert(
     phoneNumber: firstRecipient.phoneNumber,
     message: message,
   );
+
 
   if (!mounted) return;
 
@@ -678,9 +766,17 @@ activateSOS();
     }
 
     try {
-      final contacts = await FlutterContacts.getAll(
-        properties: {ContactProperty.phone},
-      );
+      final allContacts = await FlutterContacts.getAll(
+  properties: {ContactProperty.phone},
+);
+
+final contacts = allContacts
+    .where(
+      (contact) => contact.phones.any(
+        (phone) => phone.number.trim().isNotEmpty,
+      ),
+    )
+    .toList();
 
       if (!mounted) return;
 
@@ -835,20 +931,21 @@ activateSOS();
   // ============================================================
 
   void resetSOS() {
-    setState(() {
-      sosActivated = false;
+  _cancelSOSCountdown();
 
-      gettingLocation = false;
+  if (!mounted) return;
 
-      sosStatus = 'Ready';
+  setState(() {
+    sosActivated = false;
+    gettingLocation = false;
+    sosStatus = 'Ready';
+    locationText = 'Location not acquired';
+    recognizedWords = '';
+    voiceStatus = 'Voice activation ready';
+  });
 
-      locationText = 'Location not acquired';
-
-      recognizedWords = '';
-
-      voiceStatus = 'Voice activation ready';
-    });
-  }
+  debugPrint('🔄 RAKSHAK: SOS state reset');
+}
 
   // ============================================================
 
@@ -1082,6 +1179,15 @@ activateSOS();
                     color: Colors.white54,
                   ),
                 ),
+              const SizedBox(height: 6),
+
+Text(
+  '${trustedContacts.length} trusted contact${trustedContacts.length == 1 ? '' : 's'} configured',
+  style: const TextStyle(
+    color: Colors.white38,
+    fontSize: 12,
+  ),
+),
 
                 const SizedBox(height: 8),
 
