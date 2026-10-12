@@ -134,12 +134,11 @@ Completer<bool>? _sosCountdownCompleter;
     if (!mounted) return;
 
     setState(() {
-      voiceStatus = 'Voice SOS detected — countdown started';
-    });
+  voiceStatus = 'Voice SOS detected — activating immediately';
+});
 
-    // Start the same 10-second safety countdown used
-    // by the physical SOS button.
-    activateSOS();
+// Voice SOS bypasses the physical-button countdown.
+activateSOS(immediate: true);
     return;
   }
 
@@ -190,52 +189,65 @@ Completer<bool>? _sosCountdownCompleter;
 // PRODUCTION SOS
 // =================================================
 
-Future<void> activateSOS() async {
+Future<void> activateSOS({bool immediate = false}) async {
   if (_sosCountdownActive || gettingLocation) {
   debugPrint('⚠️ RAKSHAK: SOS already in progress — ignoring duplicate trigger');
   return;
 }
   debugPrint('🚨 RAKSHAK: SOS ACTIVATED');
 
-  _emergencyCountdown?.dispose();
+    _emergencyCountdown?.dispose();
 
-  setState(() {
-    sosActivated = true;
-    _sosCountdown = 10;
-    _sosCountdownActive = true;
-    sosStatus = 'Emergency activation started';
-  });
+  if (immediate) {
+    // Voice SOS: bypass the physical-button countdown.
+    setState(() {
+      sosActivated = true;
+      _sosCountdown = 0;
+      _sosCountdownActive = false;
+      sosStatus = 'Voice SOS activated — starting emergency workflow';
+    });
 
-  final countdownCompleted = Completer<bool>();
-  _sosCountdownCompleter = countdownCompleted;
+    debugPrint('🎙️🚨 RAKSHAK: Immediate voice SOS activated');
+  } else {
+    // Physical SOS button: retain the existing 10-second countdown.
+    setState(() {
+      sosActivated = true;
+      _sosCountdown = 10;
+      _sosCountdownActive = true;
+      sosStatus = 'Emergency activation started';
+    });
 
-  _emergencyCountdown = RakshakEmergencyCountdown(
-    seconds: 10,
-    onTick: (remaining) {
-      if (!mounted) return;
+    final countdownCompleted = Completer<bool>();
+    _sosCountdownCompleter = countdownCompleted;
 
-      setState(() {
-        _sosCountdown = remaining;
-      });
-    },
-    onExpired: () {
-      if (!countdownCompleted.isCompleted) {
-        countdownCompleted.complete(true);
-      }
-    },
-  );
+    _emergencyCountdown = RakshakEmergencyCountdown(
+      seconds: 10,
+      onTick: (remaining) {
+        if (!mounted) return;
 
-  _emergencyCountdown!.start();
+        setState(() {
+          _sosCountdown = remaining;
+        });
+      },
+      onExpired: () {
+        if (!countdownCompleted.isCompleted) {
+          countdownCompleted.complete(true);
+        }
+      },
+    );
 
-  final countdownFinished = await countdownCompleted.future;
+    _emergencyCountdown!.start();
 
-  if (!countdownFinished || !mounted) {
-    return;
+    final countdownFinished = await countdownCompleted.future;
+
+    if (!countdownFinished || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _sosCountdownActive = false;
+    });
   }
-
-  setState(() {
-    _sosCountdownActive = false;
-  });
 
   try {
     // Start the safety lifecycle through the existing controller.
@@ -658,7 +670,7 @@ notificationText: 'Rakshak safety service is active.',
 
       // Start the same 10-second SOS countdown used
 // by the physical SOS button.
-activateSOS();
+activateSOS(immediate: true);
     }
   },
 );
